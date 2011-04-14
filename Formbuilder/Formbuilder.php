@@ -30,6 +30,12 @@
  * @package jquery.Formbuilder
  */
 class Formbuilder {
+	const RENDER_EDITABLE = 'editable' ;
+	const RENDER_READ_ONLY = 'read-only' ;
+
+	const CHECKBOX_FETCH_FROM_POST = 'post' ;
+	const CHECKBOX_FETCH_FROM_SAVED = 'saved' ;
+	const CHECKBOX_FETCH_FROM_POST_OR_SAVED = 'post-or-saved' ;
 
 	/**
 	 * @var array Contains the form_hash and serialized form_structure from an external source (db)
@@ -55,15 +61,25 @@ class Formbuilder {
 	 */
 	protected $_hash;
 
+	/**
+	 *
+	 * @var array Holds default form data to populate the form
+	 * @access protected
+	 */
+	protected $_form_data ;
+
+	protected $_checkbox_fetch_method ;
 
 	 /**
 	  * Constructor, loads either a pre-serialized form structure or an incoming POST form
 	  * @param array $containing_form_array
 	  * @access public
 	  */
-	public function __construct($form = false){
+	public function __construct($form = false, $form_data = NULL, $checkbox_fetch_method = self::CHECKBOX_FETCH_FROM_POST_OR_SAVED){
 
 		$form = is_array($form) ? $form : array();
+		$this->setCheckboxFetchMethod( $checkbox_fetch_method ) ;
+		$this->setFormData( $form_data ) ;
 
 		// Set the serialized structure if it's provided
 		// otherwise, store the source
@@ -81,9 +97,23 @@ class Formbuilder {
 			$this->rebuild_container(); // rebuild a new container
 			
 		}
+
 		return true;
 	}
 
+	public function setFormData( $form_data ) {
+		if( $form_data != NULL ) {
+			$this->_form_data = unserialize( $form_data ) ;
+		}
+	}
+
+	public function setCheckboxFetchMethod( $checkbox_fetch_method ) {
+		if( $checkbox_fetch_method == self::CHECKBOX_FETCH_FROM_POST || $checkbox_fetch_method == self::CHECKBOX_FETCH_FROM_POST_OR_SAVED || $checkbox_fetch_method == self::CHECKBOX_FETCH_FROM_SAVED ) {
+			$this->_checkbox_fetch_method = $checkbox_fetch_method ;
+		} else {
+			die('Invalid value for $checkbox_fetch_method. Use one of the pre-defined constants.') ;
+		}
+	}
 
 	/**
 	 * Wipes and re-saves the structure and hash to the containing array.
@@ -158,7 +188,6 @@ class Formbuilder {
 		print $this->generate_xml();
 	}
 
-
 	/**
 	 * Builds an xml structure that the jquery plugin will parse for form admin
 	 * structure. Right now we're just building the xml the old fashioned way
@@ -223,9 +252,19 @@ class Formbuilder {
 		$xml .= '</form>'."\n";
 
 		return $xml;
-
 	}
 
+	public function render_json() {
+		print( $this->generate_json() ) ;
+	}
+
+	public function generate_json() {
+		$_output = '' ;
+		if( is_array( $this->_structure )) {
+			$_output = json_encode( $this->_structure ) ;
+		}
+		return $_output ;
+	}
 
 	/**
 	 * @abstract Encodes strings for xml. 
@@ -246,16 +285,31 @@ class Formbuilder {
 
 	}
 
+	public function render_read_only() {
+		print( $this->generate_read_only() ) ;
+	}
+
+	public function generate_read_only() {
+		$html = '' ;
+		if( is_array( $this->_structure )) {
+			$html .= '<ol class="form-list">' ;
+			foreach( $this->_structure as $key => $field ) {
+				$html .= $this->loadField( $field, $key, self::RENDER_READ_ONLY ) ;
+			}
+			$html .= '</ol>' ;
+		}
+		return $html ;
+	}
 
 	/**
 	 * Renders the generated html of the form.
 	 *
 	 * @param string $form_action Action attribute of the form element.
 	 * @access public
-	 * @uses generate_html
+	 * @uses generate_form_html
 	 */
-	public function render_html($form_action = false){
-		print $this->generate_html($form_action);
+	public function render_form_html($generate_form_tags = TRUE, $form_action = false, $li_only = FALSE, $generate_submit = TRUE){
+		print $this->generate_form_html($generate_form_tags, $form_action, $li_only, $generate_submit);
 	}
 
 
@@ -266,24 +320,33 @@ class Formbuilder {
 	 * @return string
 	 * @access public
 	 */
-	public function generate_html($form_action = false){
+	public function generate_form_html($generate_form_tags = TRUE, $form_action = false, $li_only = FALSE, $generate_submit = TRUE){
 
 		$html = '';
 
 		$form_action = $form_action ? $form_action : $_SERVER['PHP_SELF'];
 
 		if(is_array($this->_structure)){
-	
-			$html .= '<form class="frm-bldr" method="post" action="'.$form_action.'">' . "\n";
-			$html .= '<ol>'."\n";
-
-			foreach($this->_structure as $field){
-				$html .= $this->loadField($field);
+			if( $generate_form_tags ) {
+				$html .= '<form class="frm-bldr" method="post" action="'.$form_action.'">' . "\n";
 			}
-			
-			$html .= '<li class="btn-submit"><input type="submit" name="submit" value="Submit" /></li>' . "\n";
-			$html .=  '</ol>' . "\n";
-			$html .=  '</form>' . "\n";
+			if( !$li_only ) {
+				$html .= '<ol class="form-list">'."\n";
+			}
+
+			foreach($this->_structure as $key => $field){
+				$html .= $this->loadField($field, $key, self::RENDER_EDITABLE);
+			}
+
+			if( $generate_submit ) {
+				$html .= '<li class="btn-submit"><input type="submit" name="submit" value="Submit" /></li>' . "\n";
+			}
+			if( !$li_only ) {
+				$html .=  '</ol>' . "\n";
+			}
+			if( $generate_form_tags ) {
+				$html .=  '</form>' . "\n";
+			}
 			
 		}
 
@@ -306,28 +369,48 @@ class Formbuilder {
 
 		// Put together an array of all expected indices
 		if(is_array($this->_structure)){
-			foreach($this->_structure as $field){
+			foreach($this->_structure as $key => $field){
 
-				$field['required'] = $field['required'] == 'true' ? true : false;
+				$isRequired = NULL ;
+				if( $field[ 'required' ] === '1' ) {
+					$isRequired = TRUE ;
+				} elseif( $field[ 'required' ] === '0' ) {
+					$isRequired = FALSE ;
+				} elseif( $field[ 'required' ] == 'undefined' ) {
+					$isRequired = FALSE ;
+				} else {
+					// this is dependent on a previous question...
+					preg_match('/^_(\d+)_eq_(.*)/', $field[ 'required' ], $matches) ;
+
+					$drivingQuestionKey = $matches[1] ;
+					$drivingQuestionTestValue = $matches[2] ;
+
+					$drivingQuestionValue = $this->getPostValue(
+							$this->elemId(
+									$this->_structure[ $drivingQuestionKey ][ 'title' ], $drivingQuestionKey
+							)
+					) ;
+
+					$isRequired = preg_replace('/\W/','',$drivingQuestionValue) == $drivingQuestionTestValue ;
+				}
 
 				if($field['class'] == 'input_text' || $field['class'] == 'textarea'){
 
-					$val = $this->getPostValue( $this->elemId($field['values']));
+					$val = $this->getPostValue( $this->elemId($field['values'], $key));
+					$valAlt = strip_tags($val) ;
+					$results[ $this->elemId($field['values'], $key) ] = $val;
 
-					if($field['required'] && empty($val)){
+					if($isRequired && (empty($val) || empty( $valAlt ))) {
 						$error .= '<li>Please complete the ' . $field['values'] . ' field.</li>' . "\n";
-					} else {
-						$results[ $this->elemId($field['values']) ] = $val;
-					}
+					} 
 				}
 				elseif($field['class'] == 'radio' || $field['class'] == 'select'){
 
-					$val = $this->getPostValue( $this->elemId($field['title']));
+					$val = $this->getPostValue( $this->elemId($field['title'], $key));
+					$results[ $this->elemId($field['title'], $key) ] = $val;
 
-					if($field['required'] && empty($val)){
+					if($isRequired && empty($val)){
 						$error .= '<li>Please complete the ' . $field['title'] . ' field.</li>' . "\n";
-					} else {
-						$results[ $this->elemId($field['title']) ] = $val;
 					}
 				}
 				elseif($field['class'] == 'checkbox'){
@@ -337,7 +420,7 @@ class Formbuilder {
 
 						foreach($field['values'] as $item){
 
-							$elem_id = $this->elemId($item['value'], $field['title']);
+							$elem_id = $this->elemId($field['title'], $key) . '-' . $this->elemId( $item['value'], $key);
 
 							$val = $this->getPostValue( $elem_id );
 
@@ -345,20 +428,26 @@ class Formbuilder {
 								$at_least_one_checked = true;
 							}
 
-							$results[ $this->elemId($item['value']) ] = $this->getPostValue( $elem_id );
+							$results[ $elem_id ] = $this->getPostValue( $elem_id );
 						}
 
-						if(!$at_least_one_checked && $field['required']){
+						if(!$at_least_one_checked && $isRequired){
 							$error .= '<li>Please check at least one ' . $field['title'] . ' choice.</li>' . "\n";
 						}
 					}
-				} else { }
+				} elseif( $field[ 'class' ] == 'fileupload') {
+					$val = $this->getFileArray( $this->elemId( $field[ 'values' ], $key)) ;
+					$results[ $this->elemId( $field[ 'values' ], $key)] = $val ;
+					
+					if( $isRequired && empty( $val )) {
+						$error .= '<li>File required for ' . $field[ 'values' ] . '</li>' . "\n" ;
+					}
+				}
 			}
 		}
 
 		$success = empty($error);
 
-		// if results is array, send email
 		return array('success'=>$success,'results'=>$results,'errors'=>$error);
 		
 	}
@@ -376,27 +465,33 @@ class Formbuilder {
 	 * @access protected
 	 * @return string
 	 */
-	protected function loadField($field){
-
+	protected function loadField($field, $key, $mode = self::RENDER_EDITABLE){
+	 
 		if(is_array($field) && isset($field['class'])){
 
 			switch($field['class']){
 
 				case 'input_text':
-					return $this->loadInputText($field);
+					return $this->loadInputText($field, $key, $mode);
 					break;
 				case 'textarea':
-					return $this->loadTextarea($field);
+					return $this->loadTextarea($field, $key, $mode);
 					break;
 				case 'checkbox':
-					return $this->loadCheckboxGroup($field);
+					return $this->loadCheckboxGroup($field, $key, $mode);
 					break;
 				case 'radio':
-					return $this->loadRadioGroup($field);
+					return $this->loadRadioGroup($field, $key, $mode);
 					break;
 				case 'select':
-					return $this->loadSelectBox($field);
+					return $this->loadSelectBox($field, $key, $mode);
 					break;
+				case 'sectionheader':
+					return $this->loadSectionHeader( $field, $key, $mode ) ;
+					break ;
+				case 'fileupload':
+					return $this->loadFileUpload( $field, $key, $mode ) ;
+					break ;
 			}
 		}
 
@@ -404,6 +499,68 @@ class Formbuilder {
 
 	}
 
+	/**
+	 * Returns html for a file upload field
+	 *
+	 * @param array $field Field values from database
+	 * @access protected
+	 * @return string
+	 */
+	protected function loadFileUpload( $field, $key, $mode ) {
+		$requiredClass = $this->getRequiredClass( $field[ 'required' ] ) ;
+
+		$download_link = '<em>No file uploaded.</em>' ;
+		$uploaded_file_name = '' ;
+		$uploaded_file_array = $this->getDefaultValue($this->elemId($field['values'], $key)) ;
+
+		if( is_array( $uploaded_file_array ) && isset( $uploaded_file_array[ 'name' ]) && !empty( $uploaded_file_array[ 'name' ])) {
+			$uploaded_file_name = $uploaded_file_array[ 'name' ] ;
+			$download_link = "<a href='#' class='download-link'>{$uploaded_file_array[ 'name' ]}</a>" ;
+		}
+
+
+		$html = '' ;
+
+		$html .= sprintf('<li class="%s%s" id="fld-%s">' . "\n", $this->elemId($field['class']), $requiredClass, $this->elemId($field['values']));
+		if( $mode == self::RENDER_EDITABLE ) {
+
+			$html .= sprintf('<label for="%s">%s</label>' . "\n", $this->elemId($field['values'], $key), $field['values']);
+			$html .= "<span class='multi-row clearfix'>" ;
+			$html .= sprintf('<input type="file" id="%s" name="%s" value="%s" />' . "\n",
+									$this->elemId($field['values'], $key),
+									$this->elemId($field['values'], $key),
+									$this->getDefaultValue($this->elemId($field['values'], $key)));
+			$html .= "<span class='current-file'>Current File: {$download_link}</span>" ;
+			$html .= "</span>" ;
+		} else {
+			$html .= sprintf("<input type='hidden' name='%s' value='%s' />", $this->elemId( $field[ 'values' ], $key ), $uploaded_file_name) ;
+			$html .= sprintf("<span class='false_label'>%s</span>", $field['values']) ;
+//			$html .= sprintf("<span class='saved-value'>%s</span>", $this->getDefaultValue( $this->elemId( $field[ 'values' ]))) ;
+			$html .= "<span class='current-file'>{$download_link}</span>" ;
+		}
+		$html .= '</li>' . "\n" ;
+		
+		return $html ;
+	}
+	
+
+	/**
+	 * Returns html for a section header
+	 *
+	 * @param array $field Field values from database
+	 * @access protected
+	 * @return string
+	 */
+	protected function loadSectionHeader( $field, $key, $mode ) {
+
+		$html = '' ;
+		$html .= sprintf('<li class="%s">' . "\n", $this->elemId($field['class']));
+		$html .= sprintf('<div class="section-head-title">%s</div>', $field['title']) ;
+		$html .= sprintf('<div class="section-head-para">%s</div>', $field['paragraph']) ;
+		$html .= '</li>' . "\n" ;
+		
+		return $html ;
+	}
 
 	/**
 	 * Returns html for an input type="text"
@@ -412,17 +569,24 @@ class Formbuilder {
 	 * @access protected
 	 * @return string
 	 */
-	protected function loadInputText($field){
+	protected function loadInputText($field, $key, $mode){
 
-		$field['required'] = $field['required'] == 'true' ? ' required' : false;
+//		$field['required'] = $field['required'] == 'true' ? ' required' : false;
 
+		$requiredClass = $this->getRequiredClass( $field[ 'required' ] ) ;
+		
 		$html = '';
-		$html .= sprintf('<li class="%s%s" id="fld-%s">' . "\n", $this->elemId($field['class']), $field['required'], $this->elemId($field['values']));
-		$html .= sprintf('<label for="%s">%s</label>' . "\n", $this->elemId($field['values']), $field['values']);
-		$html .= sprintf('<input type="text" id="%s" name="%s" value="%s" />' . "\n",
-								$this->elemId($field['values']),
-								$this->elemId($field['values']),
-								$this->getPostValue($this->elemId($field['values'])));
+		$html .= sprintf('<li class="%s%s" id="fld-%s">' . "\n", $this->elemId($field['class']), $requiredClass, $this->elemId($field['values'], $key));
+		if( $mode == self::RENDER_EDITABLE ) {
+			$html .= sprintf('<label for="%s">%s</label>' . "\n", $this->elemId($field['values'], $key), $field['values']);
+			$html .= sprintf('<input type="text" id="%s" name="%s" value="%s" />' . "\n",
+									$this->elemId($field['values'], $key),
+									$this->elemId($field['values'], $key),
+									$this->getDefaultValue($this->elemId($field['values'], $key)));
+		} else {
+			$html .= "<span class='false_label'>{$field[ 'values' ]}</span>" ;
+			$html .= "<span class='saved-value'>".$this->getDefaultValue( $this->elemId( $field[ 'values' ], $key ))."</span>" ;
+		}
 		$html .= '</li>' . "\n";
 
 		return $html;
@@ -437,17 +601,22 @@ class Formbuilder {
 	 * @access protected
 	 * @return string
 	 */
-	protected function loadTextarea($field){
+	protected function loadTextarea($field, $key, $mode){
 
-		$field['required'] = $field['required'] == 'true' ? ' required' : false;
+		$requiredClass = $this->getRequiredClass( $field[ 'required' ]) ;
 
 		$html = '';
-		$html .= sprintf('<li class="%s%s" id="fld-%s">' . "\n", $this->elemId($field['class']), $field['required'], $this->elemId($field['values']));
-		$html .= sprintf('<label for="%s">%s</label>' . "\n", $this->elemId($field['values']), $field['values']);
-		$html .= sprintf('<textarea id="%s" name="%s" rows="5" cols="50">%s</textarea>' . "\n",
-								$this->elemId($field['values']),
-								$this->elemId($field['values']),
-								$this->getPostValue($this->elemId($field['values'])));
+		$html .= sprintf('<li class="%s%s" id="fld-%s">' . "\n", $this->elemId($field['class']), $requiredClass, $this->elemId($field['values'], $key));
+		if( $mode == self::RENDER_EDITABLE ) {
+			$html .= sprintf('<label for="%s">%s</label>' . "\n", $this->elemId($field['values'], $key), $field['values']);
+			$html .= sprintf('<textarea id="%s" name="%s" rows="5" cols="50" class="wysiwyg">%s</textarea>' . "\n",
+									$this->elemId($field['values'], $key),
+									$this->elemId($field['values'], $key),
+									$this->getDefaultValue($this->elemId($field['values'], $key)));
+		} else {
+			$html .= "<span class='false_label'>{$field['values']}</span>" ;
+			$html .= "<span class='saved-value'>".$this->getDefaultValue($this->elemId($field['values'], $key))."</span>" ;
+		}
 		$html .= '</li>' . "\n";
 
 		return $html;
@@ -462,12 +631,23 @@ class Formbuilder {
 	 * @access protected
 	 * @return string
 	 */
-	protected function loadCheckboxGroup($field){
+	protected function loadCheckboxGroup($field, $key, $mode){
 
-		$field['required'] = $field['required'] == 'true' ? ' required' : false;
+		switch( $this->_checkbox_fetch_method ) {
+			case self::CHECKBOX_FETCH_FROM_POST:
+				$fetchMethod = 'getPostValue' ;
+				break ;
+			case self::CHECKBOX_FETCH_FROM_SAVED:
+				$fetchMethod = 'getPreviousValue' ;
+				break ;
+			default:
+				$fetchMethod = 'getDefaultValue' ;
+		}
+
+		$requiredClass = $this->getRequiredClass( $field[ 'required' ]) ;
 
 		$html = '';
-		$html .= sprintf('<li class="%s%s" id="fld-%s">' . "\n", $this->elemId($field['class']), $field['required'], $this->elemId($field['title']));
+		$html .= sprintf('<li class="%s%s" id="fld-%s">' . "\n", $this->elemId($field['class']), $requiredClass, $this->elemId($field['title'], $key));
 
 		if(isset($field['title']) && !empty($field['title'])){
 			$html .= sprintf('<span class="false_label">%s</span>' . "\n", $field['title']);
@@ -481,14 +661,34 @@ class Formbuilder {
 				$checked = $item['default'] == 'true' ? true : false;
 
 				// load post value
-				$val = $this->getPostValue($this->elemId($item['value']));
+				$val = $this->$fetchMethod($this->elemId($field['title'], $key) .'-'. $this->elemId($item['value'], $key));
 				$checked = !empty($val);
 
-				// if checked, set html
-				$checked = $checked ? ' checked="checked"' : '';
+				if( $mode == self::RENDER_EDITABLE ) {
+					// if checked, set html
+					$checked = $checked ? ' checked="checked"' : '';
 
-				$checkbox 	= '<span class="row clearfix"><input type="checkbox" id="%s-%s" name="%s-%s" value="%s"%s /><label for="%s-%s">%s</label></span>' . "\n";
-				$html .= sprintf($checkbox, $this->elemId($field['title']), $this->elemId($item['value']), $this->elemId($field['title']), $this->elemId($item['value']), $item['value'], $checked, $this->elemId($field['title']), $this->elemId($item['value']), $item['value']);
+					$checkbox 	= '<span class="row clearfix"><input type="checkbox" id="%s-%s" name="%s-%s" value="%s"%s /><label for="%s-%s">%s</label></span>' . "\n";
+					$html .= sprintf(
+						$checkbox, 
+						
+						$this->elemId($field['title'], $key), 
+						$this->elemId($item['value'], $key), 
+						
+						$this->elemId($field['title'], $key),
+						$this->elemId($item['value'], $key), 
+						$item['value'], 
+						$checked, 
+						$this->elemId($field['title']), 
+						$this->elemId($item['value'], $key), 
+						$item['value']
+					);
+
+				} else {
+					$checked = $checked ? ' selected' : '' ;
+					$html .= "<span class='saved-value{$checked}'>{$item['value']}</span>" ;
+				}
+
 			}
 			$html .= sprintf('</span>') . "\n";
 		}
@@ -506,13 +706,13 @@ class Formbuilder {
 	 * @access protected
 	 * @return string
 	 */
-	protected function loadRadioGroup($field){
+	protected function loadRadioGroup($field, $key, $mode){
 
-		$field['required'] = $field['required'] == 'true' ? ' required' : false;
+		$requiredClass = $this->getRequiredClass( $field[ 'required' ]) ;
 
 		$html = '';
 
-		$html .= sprintf('<li class="%s%s" id="fld-%s">' . "\n", $this->elemId($field['class']), $field['required'], $this->elemId($field['title']));
+		$html .= sprintf('<li class="%s%s" id="fld-%s">' . "\n", $this->elemId($field['class']), $requiredClass, $this->elemId($field['title']));
 
 		if(isset($field['title']) && !empty($field['title'])){
 			$html .= sprintf('<span class="false_label">%s</span>' . "\n", $field['title']);
@@ -526,18 +726,25 @@ class Formbuilder {
 				$checked = $item['default'] == 'true' ? true : false;
 
 				// load post value
-				$val = $this->getPostValue($this->elemId($field['title']));
-				$checked = !empty($val);
+				$val = $this->getDefaultValue($this->elemId($field['title'], $key));
+				$checked = $val == $item['value'] ;
 
-				// if checked, set html
-				$checked = $checked ? ' checked="checked"' : '';
+				if( $mode == self::RENDER_EDITABLE ) {
+					// if checked, set html
+					$checked = $checked ? ' checked="checked"' : '';
 
-				$radio 		= '<span class="row clearfix"><input type="radio" id="%s-%s" name="%1$s" value="%s"%s /><label for="%1$s-%2$s">%3$s</label></span>' . "\n";
-				$html .= sprintf($radio,
-										$this->elemId($field['title']),
-										$this->elemId($item['value']),
-										$item['value'],
-										$checked);
+					$radio 		= '<span class="row clearfix"><input type="radio" id="%s-%s" name="%1$s" value="%s"%s /><label for="%1$s-%2$s">%3$s</label></span>' . "\n";
+					$html .= sprintf($radio,
+											$this->elemId($field['title'], $key),
+											$this->elemId($item['value']),
+											$item['value'],
+											$checked);
+				} else {
+					$checked = $checked ? ' selected' : '' ;
+					$html .= "<span class='saved-value{$checked}'>{$item['value']}</span>" ;
+				}
+
+
 			}
 			$html .= sprintf('</span>') . "\n";
 		}
@@ -556,39 +763,68 @@ class Formbuilder {
 	 * @access protected
 	 * @return string
 	 */
-	protected function loadSelectBox($field){
+	protected function loadSelectBox($field, $key, $mode){
 
-		$field['required'] = $field['required'] == 'true' ? ' required' : false;
+		$requiredClass = $this->getRequiredClass( $field[ 'required' ]) ;
 
 		$html = '';
 
-		$html .= sprintf('<li class="%s%s" id="fld-%s">' . "\n", $this->elemId($field['class']), $field['required'], $this->elemId($field['title']));
+		$html .= sprintf('<li class="%s%s" id="fld-%s">' . "\n", $this->elemId($field['class']), $requiredClass, $this->elemId($field['title'], $key));
 
 		if(isset($field['title']) && !empty($field['title'])){
-			$html .= sprintf('<label for="%s">%s</label>' . "\n", $this->elemId($field['title']), $field['title']);
+			$html .= sprintf('<label for="%s">%s</label>' . "\n", $this->elemId($field['title'], $key), $field['title']);
 		}
 
 		if(isset($field['values']) && is_array($field['values'])){
-			$multiple = $field['multiple'] == "true" ? ' multiple="multiple"' : '';
-			$html .= sprintf('<select name="%s" id="%s"%s>' . "\n", $this->elemId($field['title']), $this->elemId($field['title']), $multiple);
+			if( $mode == self::RENDER_EDITABLE ) {
+			
+				$multiple = $field['multiple'] == "true" ? ' multiple="multiple"' : '';
+				$html .= sprintf('<select name="%s" id="%s"%s>' . "\n", $this->elemId($field['title'], $key), $this->elemId($field['title'], $key), $multiple);
 
-			foreach($field['values'] as $item){
+				foreach($field['values'] as $item){
 
-				// set the default checked value
-				$checked = $item['default'] == 'true' ? true : false;
+					// set the default checked value
+					$selected = $item['default'] == 'true' ? true : false;
 
-				// load post value
-				$val = $this->getPostValue($this->elemId($field['title']));
-				$checked = !empty($val);
+					// load post value
+					$val = $this->getDefaultValue($this->elemId($field['title'], $key));
 
-				// if checked, set html
-				$checked = $checked ? ' checked="checked"' : '';
+					$selected = !empty($val) && $item['value'] == $val ;
 
-				$option 	= '<option value="%s"%s>%s</option>' . "\n";
-				$html .= sprintf($option, $item['value'], $checked, $item['value']);
+					if( $mode == self::RENDER_EDITABLE ) {
+						// if selected, set html
+						$selected = $selected ? ' selected="selected"' : '';
+
+						$option 	= '<option value="%s"%s>%s</option>' . "\n";
+						$html .= sprintf($option, $item['value'], $selected, $item['value']);
+
+					} else {
+						$selected = $selected ? ' selected' : '' ;
+						$html .= "<span class='saved-value{$selected}'>{$item['value']}</span>" ;
+					}
+
+
+				}
+				$html .= '</select>' . "\n";
+
+			} else {
+				
+				foreach($field['values'] as $item){
+					// set the default checked value
+					$selected = $item['default'] == 'true' ? true : false;
+
+					// load post value
+					$val = $this->getDefaultValue($this->elemId($field['title'], $key));
+
+					$selected = !empty($val) && $item['value'] == $val ;
+
+					if( !empty( $val ) && $item[ 'value' ] == $val ) {
+						$html .= "<span class='saved-value{$selected}'>{$item['value']}</span>" ;
+					}
+				}
 			}
 
-			$html .= '</select>' . "\n";
+
 			$html .= '</li>' . "\n";
 
 		}
@@ -598,17 +834,32 @@ class Formbuilder {
 	}
 
 
+	private function getRequiredClass( $required ) {
+		$_output = '' ;
+		if( $required == 1 ) {
+			$_output = ' required' ;
+		} elseif( $required !== 0 ) {
+			$_output = ' ' . $required ;
+		}
+		return $_output ;
+	}
+
 	/**
 	 * Generates an html-safe element id using it's label
 	 * 
 	 * @param string $label
 	 * @return string
 	 * @access protected
+	 * @todo Ensure that this creates a unique, repeatable ID.
 	 */
-	private function elemId($label, $prepend = false){
+	private function elemId($label, $key = NULL, $prepend = false){
+		$_key = '' ;
+		if( $key !== '' && $key !== NULL ) {
+			$_key = "_{$key}_" ;
+		}
 		if(is_string($label)){
 			$prepend = is_string($prepend) ? $this->elemId($prepend).'-' : false;
-			return $prepend.strtolower( preg_replace("/[^A-Za-z0-9_]/", "", str_replace(" ", "_", $label) ) );
+			return $_key.$prepend.strtolower( preg_replace("/[^A-Za-z0-9_]/", "", str_replace(" ", "_", $label) ) );
 		}
 		return false;
 	}
@@ -622,5 +873,42 @@ class Formbuilder {
 	protected function getPostValue($key){
 		return array_key_exists($key, $_POST) ? $_POST[$key] : false;
 	}
+
+	/**
+	 * Attempts to load FILES value into the field if it's set.
+	 *
+	 * @param string $key
+	 * @return mixed
+	 */
+	protected function getFileArray( $key ) {
+		$_output = FALSE ;
+		if( array_key_exists( $key, $_FILES ) && $_FILES[ $key ][ 'error' ] === UPLOAD_ERR_OK ) {
+			$_output = $_FILES[ $key ] ;
+		} elseif ( array_key_exists( $key, $this->_form_data )) {
+			$_output = $this->_form_data[ $key ] ;
+		}
+		
+		return $_output ;
+	}
+
+
+	protected function getPreviousValue( $key ) {
+		$_output = FALSE ;
+		if( is_array( $this->_form_data ) && isset( $this->_form_data[ $key ]) ) {
+			$_output = $this->_form_data[ $key ] ;
+		}
+		return $_output ;
+	}
+
+	protected function getDefaultValue( $key ) {
+		$_output = $this->getPostValue( $key ) ;
+		if( $_output === FALSE ) {
+			$_output = $this->getPreviousValue($key) ;
+		}
+
+		return $_output ;
+	}
+
+
 }
 ?>
