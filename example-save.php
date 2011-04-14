@@ -17,7 +17,7 @@ $for_db = $form->store();
 // is also what's passed to the class when rendering
 // or editing the form.
 
-print_r($for_db);
+print_r( json_encode( $for_db ));
 
 /*
 Outputs:

@@ -1,0 +1,241 @@
+/*
+	This is for the final output of the form.
+*/
+
+form.frm-bldr {}
+
+form.frm-bldr ol.form-list {
+	list-style-type: none;
+	margin: 0px ;
+	padding: 0px ;
+}
+
+form.frm-bldr ol.form-list li {
+	list-style-type: none;
+	margin: 4px;
+	padding: 4px 0px;
+	clear: both ;
+	border-top: 1px solid #CCCCCC ;
+}
+
+form.frm-bldr ol.form-list li.required {
+	background-image: url(../images/red_asterisk.gif);
+	background-repeat: no-repeat;
+	background-position: 0px 4px;
+	overflow: visible;
+	min-height: 12px ;
+}
+
+span.false_label {
+	clear:both ;
+	width: 200px ;
+	display: block ;
+	float: left ;
+	margin-left: 12px ;
+}
+li.textarea span.false_label {
+	float: none ;
+}
+
+
+span.saved-value {
+	display: block ;
+	padding-left:14px ;
+}
+span.current-file {
+	display: block ;
+	padding-left: 4px ;
+}
+span.selected {
+	background-image: url(images/green_check.gif);
+	background-repeat: no-repeat;
+	background-position: 0px 4px;
+	overflow: visible;
+	min-height: 12px ;
+}
+
+form.frm-bldr ol.form-list li.input_text label,
+form.frm-bldr ol.form-list li.checkbox span.false_label,
+form.frm-bldr ol.form-list li.radio span.false_label,
+form.frm-bldr ol.form-list li.fileupload label,
+form.frm-bldr ol.form-list li.select label,
+form.frm-bldr ol.form-list li.related-items span.related-items-label
+{
+	clear:both ;
+	width: 200px ;
+	display: block ;
+	float: left ;
+	margin-left: 12px ;
+}
+
+form.frm-bldr ol.form-list li.textarea label {
+	clear: both ;
+	display: block ;
+	float: none ;
+	margin-left: 12px ;
+}
+
+
+form.frm-bldr ol.form-list li.checkbox span.multi-row,
+form.frm-bldr ol.form-list li.radio span.multi-row,
+form.frm-bldr ol.form-list li.fileupload span.multi-row {
+	float:left ;
+}
+
+form.frm-bldr ol.form-list li.checkbox span.multi-row span.row,
+form.frm-bldr ol.form-list li.radio span.multi-row span.row {
+	display: block ;
+}
+
+form.frm-bldr ol.form-list li.sectionheader div.section-head-title {
+	font-weight: bold ;
+	background-color: #DDDDDD ;
+	padding-left: 12px ;
+}
+
+form.frm-bldr ol.form-list li.sectionheader div.section-head-para {
+	padding-left: 12px ;
+	font-style: italic;
+}
+
+form.frm-bldr ol.form-list li.btn-submit {
+	text-align: right ;
+}
+
+/*
+	CSS for the Form Builder tool itself
+*/
+
+a, body {
+	font-family: "Tahoma", "Verdana", sans-serif;
+	font-size: 12px;
+}
+
+#form-wrap {
+	width: 600px;
+}
+
+#form-builder li {
+	list-style: none;
+	background-color: #CFCFCF;
+	margin-bottom: 5px;
+	-moz-border-radius: 3px;
+	-webkit-border-radius: 3px;
+}
+
+#form-builder .legend {
+	padding: 5px;
+	cursor: move;
+}
+
+.field_control {
+	margin-left: 40px;
+}
+
+.frm-elements {
+	background-color: rgba(255,255,255,0.70);
+	margin: 0 4px 4px 4px;
+	padding: 9px;
+	-moz-border-radius: 3px;
+	-webkit-border-radius: 3px;
+}
+
+.frm-elements label { 
+	width: 120px;
+	float: left;
+	margin: 0 15px;
+	line-height: 24px;
+}
+
+.frm-elements .false-label { 
+	width: 120px;
+	float: left;
+	margin: 0 15px;
+	font-size: 10px;
+	text-transform: uppercase;
+	font-weight: bold;
+	line-height: 24px;
+}
+
+.frm-elements input[type=text] { 
+	float: left;
+	width: 280px;
+}
+
+.frm-elements .fields {  
+	float: left;
+}
+
+.frm-elements .fields input[type=checkbox], .frm-elements .fields input[type=radio] { 
+	float: left;
+	margin: 5px 10px 0 0;
+}
+
+.frm-elements .fields input[type=text] { 
+	width: 220px;
+	margin-top: 0;
+}
+
+.frm-elements .false-label, .frm-elements .fields {
+	margin-top: 10px;
+}
+
+.frm-elements .fields div {
+	clear: both;
+	float: left;
+	width: 300px;
+	margin-bottom: 5px;
+}
+
+.frm-elements .fields label.auto {
+	width: auto;
+	margin: 0 0 5px 0;
+}
+
+.frm-elements .fields .remove {
+	float: right;
+}
+
+.frm-elements .fields .add-area {
+	width: 280px;
+	margin-top: 5px;
+	border-top: 1px solid rgba(255,255,255,0.125);
+}
+
+.frm-elements .fields .add-area .add {
+	clear: both;
+	float: right;
+}
+
+.frm-elements:after, .frm-fld:after {
+	content: ".";
+	display: block;
+	height: 0;
+	clear: both;
+	visibility: hidden;
+}
+
+.frm-elements, .frm-fld {
+	display: inline-block;
+}
+
+.frm-elements, .frm-fld {
+	display: block;
+}
+
+.frm-elements .frm-fld textarea {
+	width: 280px;
+	height: 120px;
+}
+
+.del-button {
+	padding: 5px 0 10px 15px;
+	display: block;
+	clear: both;
+	width: 50px;
+}
+
+.question-number {
+	float: right;
+	font-weight: bold;
+}

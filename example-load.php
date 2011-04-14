@@ -9,6 +9,9 @@ require('Formbuilder/Formbuilder.php');
 include('fake-form-db-vals.php');
 
 $form = new Formbuilder($fake_db_vals);
-$form->render_xml();
+
+// $form->render_xml();
+$form->render_json() ;
+
 
 ?>

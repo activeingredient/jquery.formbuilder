@@ -4,6 +4,13 @@
 	<head>
 		<title>jQuery FormBuilder Demo (Output)</title>
 		<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+
+		<link rel="stylesheet" href="css/formbuilder.css" />
+		<script type="text/javascript" src="js/jquery-1.5.1.min.js"></script>
+		<script type="text/javascript" src="js/jquery-ui-1.8.11.custom.min.js"></script>
+		<script type="text/javascript" src="js/jquery.scrollTo-min.js"></script>
+		<script type="text/javascript" src="js/jquery.formbuilder.js"></script>
+
 	</head>
 	<body>
 
@@ -18,7 +25,8 @@ require('Formbuilder/Formbuilder.php');
 include('fake-form-db-vals.php');
 
 $form = new Formbuilder($fake_db_vals);
-$form->render_html('example-submit.php');
+
+$form->render_form_html(TRUE, 'example-submit.php');
 
 ?>
 
