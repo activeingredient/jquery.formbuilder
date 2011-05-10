@@ -19,10 +19,6 @@
  * Please feel free to fork the project and provide patches back.
  */
 
- // Uncomment these for debug
-//error_reporting(E_ALL);
-//ini_set('display_errors', true);
-
 
 /**
  * @abstract This class is the server-side component that handles interaction with
@@ -69,6 +65,8 @@ class Formbuilder {
 	protected $_form_data ;
 
 	protected $_checkbox_fetch_method ;
+	
+	protected $_use_POST = TRUE ;
 
 	 /**
 	  * Constructor, loads either a pre-serialized form structure or an incoming POST form
@@ -101,6 +99,19 @@ class Formbuilder {
 		return true;
 	}
 
+	public function length() {
+		$_output = 0 ;
+		
+		if( is_array( $this->_structure )) {
+			$_output = count( $this->_structure ) ;
+		}
+		
+		return $_output ;
+	}
+	public function ignorePost() {
+		$this->_use_POST = FALSE ;
+	}
+	
 	public function setFormData( $form_data ) {
 		if( $form_data != NULL ) {
 			$this->_form_data = unserialize( $form_data ) ;
@@ -296,6 +307,7 @@ class Formbuilder {
 			foreach( $this->_structure as $key => $field ) {
 				$html .= $this->loadField( $field, $key, self::RENDER_READ_ONLY ) ;
 			}
+			$html .= '<li></li>' ;
 			$html .= '</ol>' ;
 		}
 		return $html ;
@@ -331,7 +343,7 @@ class Formbuilder {
 				$html .= '<form class="frm-bldr" method="post" action="'.$form_action.'">' . "\n";
 			}
 			if( !$li_only ) {
-				$html .= '<ol class="form-list">'."\n";
+				$html .= '<ol class="form-list live">'."\n";
 			}
 
 			foreach($this->_structure as $key => $field){
@@ -341,6 +353,7 @@ class Formbuilder {
 			if( $generate_submit ) {
 				$html .= '<li class="btn-submit"><input type="submit" name="submit" value="Submit" /></li>' . "\n";
 			}
+			$html .= '<li></li>' ;
 			if( !$li_only ) {
 				$html .=  '</ol>' . "\n";
 			}
@@ -364,7 +377,7 @@ class Formbuilder {
 	 */
 	public function process(){
 
-		$error		= '';
+		$errors		= array();
 		$results 	= array();
 
 		// Put together an array of all expected indices
@@ -401,7 +414,7 @@ class Formbuilder {
 					$results[ $this->elemId($field['values'], $key) ] = $val;
 
 					if($isRequired && (empty($val) || empty( $valAlt ))) {
-						$error .= '<li>Please complete the ' . $field['values'] . ' field.</li>' . "\n";
+						$errors[] = 'Please complete the "' . $field['values'] . '" field.';
 					} 
 				}
 				elseif($field['class'] == 'radio' || $field['class'] == 'select'){
@@ -410,7 +423,7 @@ class Formbuilder {
 					$results[ $this->elemId($field['title'], $key) ] = $val;
 
 					if($isRequired && empty($val)){
-						$error .= '<li>Please complete the ' . $field['title'] . ' field.</li>' . "\n";
+						$errors[] = 'Please complete the "' . $field['title'] . '" field.' ;
 					}
 				}
 				elseif($field['class'] == 'checkbox'){
@@ -432,7 +445,7 @@ class Formbuilder {
 						}
 
 						if(!$at_least_one_checked && $isRequired){
-							$error .= '<li>Please check at least one ' . $field['title'] . ' choice.</li>' . "\n";
+							$errors[] = 'Please check at least one "' . $field['title'] . '" choice.' ;
 						}
 					}
 				} elseif( $field[ 'class' ] == 'fileupload') {
@@ -440,15 +453,15 @@ class Formbuilder {
 					$results[ $this->elemId( $field[ 'values' ], $key)] = $val ;
 					
 					if( $isRequired && empty( $val )) {
-						$error .= '<li>File required for ' . $field[ 'values' ] . '</li>' . "\n" ;
+						$errors[] = 'File required for "' . $field[ 'values' ] .'"';
 					}
 				}
 			}
 		}
 
-		$success = empty($error);
+		$success = count($errors) == 0 ;
 
-		return array('success'=>$success,'results'=>$results,'errors'=>$error);
+		return array('success'=>$success,'results'=>$results,'errors'=>$errors);
 		
 	}
 
@@ -865,7 +878,7 @@ class Formbuilder {
 	}
 
 	/**
-	 * Attempts to load the POST value into the field if it's set (errors)
+	 * Attempts to load the POST value into the field if it's set
 	 *
 	 * @param string $key
 	 * @return mixed
@@ -884,7 +897,7 @@ class Formbuilder {
 		$_output = FALSE ;
 		if( array_key_exists( $key, $_FILES ) && $_FILES[ $key ][ 'error' ] === UPLOAD_ERR_OK ) {
 			$_output = $_FILES[ $key ] ;
-		} elseif ( array_key_exists( $key, $this->_form_data )) {
+		} elseif ( is_array( $this->_form_data ) && array_key_exists( $key, $this->_form_data )) {
 			$_output = $this->_form_data[ $key ] ;
 		}
 		
@@ -901,7 +914,11 @@ class Formbuilder {
 	}
 
 	protected function getDefaultValue( $key ) {
-		$_output = $this->getPostValue( $key ) ;
+		$_output = FALSE ;
+		if( $this->_use_POST == TRUE ) {
+			$_output = $this->getPostValue( $key ) ;
+		}
+		
 		if( $_output === FALSE ) {
 			$_output = $this->getPreviousValue($key) ;
 		}

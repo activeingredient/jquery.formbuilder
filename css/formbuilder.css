@@ -8,6 +8,11 @@ form.frm-bldr ol.form-list {
 	list-style-type: none;
 	margin: 0px ;
 	padding: 0px ;
+	border: 2px solid #999999 ;
+}
+
+form.frm-bldr ol.form-list.live {
+	border: none ;
 }
 
 form.frm-bldr ol.form-list li {
@@ -18,8 +23,18 @@ form.frm-bldr ol.form-list li {
 	border-top: 1px solid #CCCCCC ;
 }
 
+form.frm-bldr ol.form-list li:first-child {
+	border-top: none ;
+}
+
+form.frm-bldr ol.form-list li:last-child {
+	border-top: none ;
+	height: 0px ;
+	padding: 2px ;
+}
+
 form.frm-bldr ol.form-list li.required {
-	background-image: url(../images/red_asterisk.gif);
+	background-image: url(../images/red_asterisk.png);
 	background-repeat: no-repeat;
 	background-position: 0px 4px;
 	overflow: visible;
@@ -47,7 +62,7 @@ span.current-file {
 	padding-left: 4px ;
 }
 span.selected {
-	background-image: url(images/green_check.gif);
+	background-image: url(../images/green_check.png);
 	background-repeat: no-repeat;
 	background-position: 0px 4px;
 	overflow: visible;
